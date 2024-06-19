@@ -45,4 +45,4 @@ def get_dataset(theta_xz,theta_yx,theta_yw,p,total):
 
 if __name__=="__main__":
     get_tuple(torch.rand(4,4),torch.rand(4,4),torch.rand(4,4),0.2)
-
+    #print(get_dataset(torch.rand(4,4),torch.rand(4,4),torch.rand(4,4),0.2,10))
