@@ -21,7 +21,10 @@ class LogisticRegression(nn.Module):
     
     def train(self, X, Y, learning_rate=0.01, epochs=100, batch_size=32, verbose=False, device='cpu'):
         self.to(device) 
-        self.linear.weight.data = torch.linalg.solve(X.T@X, X.T@Y).T
+        #self.linear.weight.data = torch.linalg.solve(X.T@X, X.T@Y).T
+        #new part - due to singular matrix
+        XTX = X.T @ X + 1e-6 * torch.eye(X.shape[1], device=device)
+        self.linear.weight.data = torch.linalg.solve(XTX, X.T @ Y).T
 
 
     def eval(self, X, Y):
