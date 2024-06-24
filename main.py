@@ -152,22 +152,23 @@ def main():
 
     print("STEP 2 DONE")
 
-    # # =============================================================================
-    # # Step 3: Estimate q(W|Z,a)
-    # # =============================================================================
+    # =============================================================================
+    # Step 3: Estimate q(W|Z,a)
+    # =============================================================================
 
-    # # Train model to estimate q(W|Z,a) using the target data
-    # ZA_target = np.hstack((Z_target, A_target))
-    # model_q_W = LogisticRegression(input_dim=ZA_target.shape[1], num_classes=W_target.shape[1])
-    # model_q_W.train(torch.tensor(ZA_target, dtype=torch.float32), torch.tensor(W_target, dtype=torch.float32))
-    # q_W_given_ZA = get_probabilities(model_q_W, Z_target, A_target)
+    # Train model to estimate q(W|Z,a) using the target data
+    ZA_target = np.hstack((Z_target, A_target))
+    model_q_W = LogisticRegression(input_dim=ZA_target.shape[1], num_classes=W_target.shape[1])
+    model_q_W.train(torch.tensor(ZA_target, dtype=torch.float32), torch.tensor(W_target, dtype=torch.float32))
+    q_W_given_ZA = get_probabilities(model_q_W, Z_target, A_target)
 
-    # if step3_debug:
-    #     # Verify the shape of q_W_given_ZA
-    #     assert q_W_given_ZA.shape == (total, W_target.shape[1]), f"q_W_given_ZA shape mismatch: {q_W_given_ZA.shape}"
-    #     print("Step 3: q_W_given_ZA shape is correct.")
+    if step3_debug:
+        # Verify the shape of q_W_given_ZA
+        assert q_W_given_ZA.shape == (num_features_Z, num_features_A, num_classes_W), f"q_W_given_ZA shape mismatch: {q_W_given_ZA.shape}"
+        assert np.allclose(q_W_given_ZA.sum(axis=2), 1.0), "q_W_given_ZA rows do not sum to 1"
+        print("Step 3: q_W_given_ZA shape and sum are correct.")
 
-    # print("Step 3 done")
+    print("STEP 3 DONE")
 
     # # =============================================================================
     # # Step 4: Linear solve for q(epsilon|Z,a)
