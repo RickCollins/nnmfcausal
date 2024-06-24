@@ -26,23 +26,6 @@ def get_data(theta_xz, theta_yx, theta_yw, p_source, p_target, total):
     return (Z_source.numpy(), U_source.numpy(), W_source.numpy(), X_source.numpy(), Y_source.numpy()), \
            (Z_target.numpy(), U_target.numpy(), W_target.numpy(), X_target.numpy(), Y_target.numpy())
 
-# def train_and_estimate_p(Z, A, Y, model_class=LogisticRegression):
-#     """
-#     Trains a model to estimate the distribution p(Y|Z, A) or p(W|Z, A).
-    
-#     Args:
-#         Z (numpy.ndarray): Feature matrix Z.
-#         A (numpy.ndarray): Feature matrix A.
-#         Y (numpy.ndarray): Target matrix Y.
-#         model_class (class): The model class to use for training. Defaults to LogisticRegression.
-
-#     Returns:
-#         model: Trained model.
-#     """
-#     ZA = np.hstack((Z, A))
-#     model = model_class(input_dim=ZA.shape[1], num_classes=Y.shape[1])
-#     model.train(torch.tensor(ZA, dtype=torch.float32), torch.tensor(Y, dtype=torch.float32))
-#     return model
 
 def get_probabilities(model, Z, A):
     """
@@ -54,34 +37,35 @@ def get_probabilities(model, Z, A):
         A (numpy.ndarray): Feature matrix A.
 
     Returns:
-        numpy.ndarray: Probability matrix.
+        numpy.ndarray: Probability matrix reshaped to (|Z|, |A|, |Y|) or (|Z|, |A|, |W|).
     """
-    ZA = np.hstack((Z, A))
-    ZA_tensor = torch.tensor(ZA, dtype=torch.float32)
-    with torch.no_grad():
-        probs = model(ZA_tensor)
-        probs = torch.softmax(probs, dim=1).numpy()
-    return probs
+    num_Z = Z.shape[1]
+    num_A = A.shape[1]
+    num_classes = model.linear.out_features
 
-# def factorize(prob_matrix, n_components):
-#     """
-#     Factorizes the probability matrix using Non-negative Matrix Factorization (NMF).
+    # Generate all possible one-hot vectors for Z
+    possible_Z = np.eye(num_Z)
+    possible_A = np.eye(num_A)
     
-#     Args:
-#         prob_matrix (numpy.ndarray): Probability matrix to factorize.
-#         n_components (int): Number of components for factorization.
+    probabilities = []
+    
+    for z in possible_Z:
+        for a in possible_A:
+            ZA = np.hstack((z.reshape(1, -1), a.reshape(1, -1)))
+            ZA_tensor = torch.tensor(ZA, dtype=torch.float32)
+            with torch.no_grad():
+                probs = model(ZA_tensor)
+                probs = torch.softmax(probs, dim=1).numpy()
+                probabilities.append(probs)
+    
+    probabilities = np.array(probabilities).reshape((num_Z, num_A, num_classes))
+    
+    return probabilities
 
-#     Returns:
-#         tuple: W and H matrices from the NMF factorization.
-#     """
-#     nmf = NMF(n_components=n_components, init='random', random_state=0)
-#     W = nmf.fit_transform(prob_matrix)
-#     H = nmf.components_
-#     return W, H
 
-# def estimate_q_W_given_ZA(Z, A, W, model_class=LogisticRegression):
-#     # use the same model class as the one used to estimate p(W|Z,A) as default, train and estimate p(W|Z,A)
-#     return train_and_estimate_p(Z, A, W, model_class)
+
+
+
 
 # linear solve for Q(Epsilon | Z, A) using linalg.lstsq
 def solve_for_q_epsilon_given_ZA(p_W_given_epsilon, q_W_given_ZA):

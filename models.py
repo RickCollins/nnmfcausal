@@ -26,7 +26,6 @@ class LogisticRegression(nn.Module):
         XTX = X.T @ X + 1e-6 * torch.eye(X.shape[1], device=device)
         self.linear.weight.data = torch.linalg.solve(XTX, X.T @ Y).T
 
-
     def eval(self, X, Y):
         correct = 0
         total = Y.size(0)
