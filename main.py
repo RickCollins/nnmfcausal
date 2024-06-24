@@ -7,8 +7,8 @@ from sklearn.decomposition import NMF  # Placeholder for volmin factorization
 def main():
     step1_debug = False
     step2_debug = False
-    step3_debug = True
-    step4_debug = True
+    step3_debug = False
+    step4_debug = False
     step5_debug = True
     step6_debug = True
 
@@ -170,30 +170,39 @@ def main():
 
     print("STEP 3 DONE")
 
-    # # =============================================================================
-    # # Step 4: Linear solve for q(epsilon|Z,a)
-    # # =============================================================================
-    # # Solves for the distribution q(ε|Z, A) using least squares.
-    # print("p_W_given_epsilon shape before transpose:", p_W_given_epsilon.shape)  # Debug
-    # print("q_W_given_ZA shape before transpose:", q_W_given_ZA.shape)  # Debug
+    # =============================================================================
+    # Step 4: Linear solve for q(epsilon|Z,a)
+    # =============================================================================
 
-    # p_W_given_epsilon = p_W_given_epsilon.T  # From step 2 # |\Epsilon| x |W| matrix for specific a
-    # q_W_given_ZA = q_W_given_ZA.T  # From step 3
+    # extract matrix from output of step 3: q_W_given_ZA
+    q_W_given_ZA_matrix = q_W_given_ZA.reshape(num_features_Z * num_features_A, num_classes_W) #TODO: check inside the reshape here. Product?????
 
-    # print("p_W_given_epsilon shape after transpose:", p_W_given_epsilon.shape)  # Debug
-    # print("q_W_given_ZA shape after transpose:", q_W_given_ZA.shape)  # Debug
+    if step4_debug:
+        print("q_W_given_ZA_matrix shape:", q_W_given_ZA_matrix.shape)
 
-    # q_epsilon_given_Z_and_A, _, _, _ = np.linalg.lstsq(p_W_given_epsilon, q_W_given_ZA, rcond=None)  # Solve by least squares
-    # q_epsilon_given_Z_and_A = q_epsilon_given_Z_and_A.T
+    # Solves for the distribution q(ε|Z, A) using least squares.
+    if step4_debug:
+        print("p_W_given_epsilon shape before transpose:", p_W_given_epsilon.shape)  # Debug
 
-    # print("q_epsilon_given_Z_and_A shape after lstsq:", q_epsilon_given_Z_and_A.shape)  # Debug
+    p_W_given_epsilon = p_W_given_epsilon.T  # From step 2 # |\Epsilon| x |W| matrix for specific a
+    q_W_given_ZA_matrix = q_W_given_ZA_matrix.T  # From step 3
 
-    # if step4_debug:
-    #     # Verify the shape of q_epsilon_given_Z_and_A
-    #     assert q_epsilon_given_Z_and_A.shape == (num_epsilon, q_W_given_ZA.shape[1]), f"q_epsilon_given_Z_and_A shape mismatch: {q_epsilon_given_Z_and_A.shape}"
-    #     print("Step 4: q_epsilon_given_Z_and_A shape is correct.")
+    if step4_debug:
+        print("p_W_given_epsilon shape after transpose:", p_W_given_epsilon.shape)  # Debug
+        print("q_W_given_ZA shape after transpose:", q_W_given_ZA_matrix.shape)  # Debug
 
-    # print("Step 4 done")
+    q_epsilon_given_Z_and_A, _, _, _ = np.linalg.lstsq(p_W_given_epsilon, q_W_given_ZA_matrix, rcond=None)  # Solve by least squares
+    q_epsilon_given_Z_and_A = q_epsilon_given_Z_and_A.T
+
+    if step4_debug:
+        print("q_epsilon_given_Z_and_A shape after lstsq:", q_epsilon_given_Z_and_A.shape)  # Debug
+
+    if step4_debug:
+        # Verify the shape of q_epsilon_given_Z_and_A
+        assert q_epsilon_given_Z_and_A.shape == (num_epsilon, q_W_given_ZA_matrix.shape[1]), f"q_epsilon_given_Z_and_A shape mismatch: {q_epsilon_given_Z_and_A.shape}"
+        print("Step 4: q_epsilon_given_Z_and_A shape is correct.")
+
+    print("STEP 4 DONE")
 
 
     # # =============================================================================
