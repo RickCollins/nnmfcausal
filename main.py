@@ -6,7 +6,7 @@ from sklearn.decomposition import NMF  # Placeholder for volmin factorization
 
 def main():
     step1_debug = False
-    step2_debug = True
+    step2_debug = False
     step3_debug = True
     step4_debug = True
     step5_debug = True
@@ -93,49 +93,64 @@ def main():
 
     print("STEP 1 DONE")
 
-    # # =============================================================================
-    # # Step 2: Factorize[p(Y|Z,a); p(W|Z,a)] into [p(Y| \Epsilon,a); p(W| \Epsilon)] and p(\Epsilon | Z,a), using volmin
-    # # =============================================================================
+    # =============================================================================
+    # Step 2: Factorize[p(Y|Z,a); p(W|Z,a)] into [p(Y| \Epsilon,a); p(W| \Epsilon)] and p(\Epsilon | Z,a), using volmin
+    # =============================================================================
 
-    # # Stack the probability matrices
-    # stacked_matrix = np.vstack((p_Y_given_ZA, p_W_given_ZA)) # this should be a |Y| x |Z| matrix stacked on top of a |W| x |Z| matrix (for specific a)
-    # print("stack_matrix shape",stacked_matrix.shape)  # Debug print statement # so this is like 10 x 4 and 10 x 4 for a 20 x 4 I think.
+    # extract the matrices from the previous outputs p_Y_given_ZA and p_W_given_ZA
+    p_Y_given_ZA_matrix = p_Y_given_ZA.reshape(num_features_Z, num_classes_Y)
+    p_W_given_ZA_matrix = p_W_given_ZA.reshape(num_features_Z, num_classes_W)
+    if step2_debug:
+        print("p_Y_given_ZA_matrix shape:", p_Y_given_ZA_matrix.shape)  # Debug print statement
+        print("p_W_given_ZA_matrix shape:", p_W_given_ZA_matrix.shape)  # Debug print statement
+        print("p_Y_given_ZA_matrix:", p_Y_given_ZA_matrix)  # Debug print statement
+        print("p_W_given_ZA_matrix:", p_W_given_ZA_matrix)  # Debug print statement
+    # Stack the probability matrices
+    stacked_matrix = np.vstack((p_Y_given_ZA_matrix, p_W_given_ZA_matrix)) # this should be a |Y| x |Z| matrix stacked on top of a |W| x |Z| matrix (for specific a)
+    if step2_debug:
+        print("stack_matrix shape",stacked_matrix.shape)  # Debug print statement # so this is like 10 x 4 and 10 x 4 for a 20 x 4 I think.
 
-    # # Determine the number of components for epsilon
-    # num_epsilon = min(W_source.shape[1], Z_source.shape[1]) # Remember we need this to be less than the min of |W| and |Z|. Consider changing this as a hyperparameter
-    # print("num_epsilon", num_epsilon)  # Debug print statement
+    # Determine the number of components for epsilon
+    num_epsilon = min(W_source.shape[1], Z_source.shape[1]) # Remember we need this to be less than the min of |W| and |Z|. Consider changing this as a hyperparameter
+    if step2_debug:
+        print("num_epsilon", num_epsilon)  # Debug print statement
 
-    # # Perform NMF factorization (Placeholder for volmin factorization)
-    # nmf = NMF(n_components=num_epsilon, init='random', random_state=0) #n_components is epsilon as it's the inner dimension in the factorisation
-    # W = nmf.fit_transform(stacked_matrix)
-    # H = nmf.components_
+    # Perform NMF factorization (Placeholder for volmin factorization)
+    nmf = NMF(n_components=num_epsilon, init='random', random_state=0) #n_components is epsilon as it's the inner dimension in the factorisation
+    W = nmf.fit_transform(stacked_matrix)
+    H = nmf.components_
 
-    # # Extract the factorized matrices
-    # p_Y_given_epsilon = W[:total, :] # |Y| x |\Epsilon| matrix for specific a
-    # p_W_given_epsilon = W[total:, :] # |W| x |\Epsilon| matrix for specific a
-    # p_epsilon_given_ZA = H # |\Epsilon| x |Z| matrix for specific a
+    if step2_debug:
+        print("W shape:", W.shape)
+        print("H shape:", H.shape)
+        print("W:", W)
+        print("H:", H)
 
-    # if step2_debug:
-    #     # Print shapes to debug
-    #     print("p_Y_given_epsilon shape:", p_Y_given_epsilon.shape)
-    #     print("p_W_given_epsilon shape:", p_W_given_epsilon.shape)
-    #     print("p_epsilon_given_ZA shape:", p_epsilon_given_ZA.shape)
-    #     print("ZA_source shape:", ZA_source.shape)
-    #     print("ZA_target shape:", ZA_target.shape)
+    # Extract the factorized matrices
+    p_Y_given_epsilon = W[:num_classes_Y, :] # |Y| x |\Epsilon| matrix for specific a #CHECK NUM_CLASSES_Y IS THE ONE
+    p_W_given_epsilon = W[num_classes_Y:, :] # |W| x |\Epsilon| matrix for specific a #CHECK NUM_CLASSES_Y IS THE ONE
+    p_epsilon_given_ZA = H # |\Epsilon| x |Z| matrix for specific a
 
-    #     # Verify the shapes of the factorized matrices
-    #     assert p_Y_given_epsilon.shape == (total, num_epsilon), f"p_Y_given_epsilon shape mismatch: {p_Y_given_epsilon.shape}"
-    #     assert p_W_given_epsilon.shape == (total, num_epsilon), f"p_W_given_epsilon shape mismatch: {p_W_given_epsilon.shape}"
-    #     expected_shape = (num_epsilon, ZA_source.shape[1])  # ZA_source.shape[1] should be 5
-    #     assert p_epsilon_given_ZA.shape == expected_shape, f"p_epsilon_given_ZA shape mismatch: {p_epsilon_given_ZA.shape}"
-    #     print("Step 2: Factorization shapes are correct.")
+    if step2_debug:
+        # Print shapes to debug
+        print("p_Y_given_epsilon shape:", p_Y_given_epsilon.shape)
+        print("p_W_given_epsilon shape:", p_W_given_epsilon.shape)
+        print("p_epsilon_given_ZA shape:", p_epsilon_given_ZA.shape)
+        print("ZA_source shape:", ZA_source.shape)
+        # Verify the shapes of the factorized matrices
+        assert p_Y_given_epsilon.shape == (num_classes_Y, num_epsilon), f"p_Y_given_epsilon shape mismatch: {p_Y_given_epsilon.shape}" #CHECK NUM_CLASSES_Y IS THE ONE
+        assert p_W_given_epsilon.shape == (num_classes_W, num_epsilon), f"p_W_given_epsilon shape mismatch: {p_W_given_epsilon.shape}" #CHECK NUM_CLASSES_W IS THE ONE
+        expected_shape = (num_epsilon, num_features_Z)  # Z_source[1] should be 4
+        print("expected_shape", expected_shape)
+        assert p_epsilon_given_ZA.shape == expected_shape, f"p_epsilon_given_ZA shape mismatch: {p_epsilon_given_ZA.shape}"
+        print("Step 2: Factorization shapes are correct.")
 
-    #     # Verify reconstruction
-    #     reconstructed_stacked_matrix = np.dot(W, H)
-    #     assert np.allclose(stacked_matrix, reconstructed_stacked_matrix, atol=1e-2), "Reconstructed matrix is not close to the original"
-    #     print("Step 2: Reconstruction is correct.")
+        # Verify reconstruction
+        reconstructed_stacked_matrix = np.dot(W, H)
+        assert np.allclose(stacked_matrix, reconstructed_stacked_matrix, atol=1e-2), "Reconstructed matrix is not close to the original"
+        print("Step 2: Reconstruction is correct.")
 
-    # print("Step 2 done")
+    print("STEP 2 DONE")
 
     # # =============================================================================
     # # Step 3: Estimate q(W|Z,a)
