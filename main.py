@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from utils import get_data, get_probabilities, solve_for_q_epsilon_given_ZA
+from utils import get_data, get_probabilities, solve_for_q_epsilon_given_ZA, estimate_q_Z_given_A
 from models import LogisticRegression
 from sklearn.decomposition import NMF  # Placeholder for volmin factorization
 
@@ -205,25 +205,24 @@ def main():
     print("STEP 4 DONE")
 
 
-    # # =============================================================================
-    # # Step 5: Estimate vector q(Z|a)
-    # # =============================================================================
-    # WA_target = np.hstack((W_target, A_target))
-    # print("WA_target shape:", WA_target.shape)  # Debug print statement
-    # print("W_target shape:", W_target.shape)  # Debug print statement
-    # print("A_target shape:", A_target.shape)  # Debug print statement
+    # =============================================================================
+    # Step 5: Estimate vector q(Z|a)
+    # =============================================================================
+    if step5_debug:
+        print("A_target shape:", A_target.shape)  # Debug print statement
 
-    # # Train model to estimate q(Z|a)
-    # model_q_Z = LogisticRegression(input_dim=WA_target.shape[1], num_classes=Z_target.shape[1])
-    # model_q_Z.train(torch.tensor(WA_target, dtype=torch.float32), torch.tensor(Z_target, dtype=torch.float32))
-    # q_Z_given_A = get_probabilities(model_q_Z, W_target, A_target)
+    # Train model to estimate q(Z|a)
+    model_q_Z = LogisticRegression(input_dim=A_target.shape[1], num_classes=Z_target.shape[1])
+    model_q_Z.train(torch.tensor(A_target, dtype=torch.float32), torch.tensor(Z_target, dtype=torch.float32))
+    q_Z_given_A = estimate_q_Z_given_A(model_q_Z, A_target, num_features_Z, num_features_A)
 
-    # if step5_debug:
-    #     # Verify the shape of q_Z_given_A
-    #     assert q_Z_given_A.shape == (total, Z_target.shape[1]), f"q_Z_given_A shape mismatch: {q_Z_given_A.shape}"
-    #     print("Step 5: q_Z_given_A shape is correct.")
+    if step5_debug:
+        # Verify the shape of q_Z_given_A
+        assert q_Z_given_A.shape == (num_features_A, num_features_Z), f"q_Z_given_A shape mismatch: {q_Z_given_A.shape}"
+        assert np.allclose(q_Z_given_A.sum(axis=1), 1.0), "q_Z_given_A rows do not sum to 1"
+        print("Step 5: q_Z_given_A shape and sum are correct.")
 
-    # print("Step 5 done")
+    print("STEP 5 DONE")
 
 
     # # =============================================================================
