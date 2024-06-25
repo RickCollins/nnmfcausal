@@ -62,7 +62,37 @@ def get_probabilities(model, Z, A):
     
     return probabilities
 
+def estimate_q_Z_given_A(model, A, num_classes_Z, num_features_A):
+    """
+    Estimate q(Z|a) using the given model.
+    
+    Args:
+        model (model): Trained model.
+        A (numpy.ndarray): Feature matrix A.
+        num_classes_Z (int): Number of classes for Z.
+        num_features_A (int): Number of features for A.
 
+    Returns:
+        numpy.ndarray: Estimated q(Z|a) matrix.
+    """
+    num_A = A.shape[1]
+    num_classes = model.linear.out_features
+
+    # Generate all possible one-hot vectors for A
+    possible_A = np.eye(num_A)
+    
+    probabilities = []
+    
+    for a in possible_A:
+        A_sample = a.reshape(1, -1)
+        A_tensor = torch.tensor(A_sample, dtype=torch.float32)
+        with torch.no_grad():
+            probs = model(A_tensor)
+            probs = torch.softmax(probs, dim=1).numpy()
+            probabilities.append(probs)
+    
+    probabilities = np.array(probabilities).reshape((num_features_A, num_classes_Z))
+    return probabilities
 
 
 
