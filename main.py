@@ -9,7 +9,7 @@ def main():
     step2_debug = False
     step3_debug = False
     step4_debug = False
-    step5_debug = True
+    step5_debug = False
     step6_debug = True
 
     # =============================================================================
@@ -225,27 +225,36 @@ def main():
     print("STEP 5 DONE")
 
 
-    # # =============================================================================
-    # # Step 6: Compute q(Y|a)
-    # # =============================================================================
-    # # Use the components to find q(Y|a)
-    # print("p_Y_given_epsilon shape:", p_Y_given_epsilon.shape)  # Debug print statement
-    # print("q_epsilon_given_Z_and_A shape:", q_epsilon_given_Z_and_A.shape)  # Debug print statement
-    # print("q_Z_given_A shape:", q_Z_given_A.shape)  # Debug print statement
+    # =============================================================================
+    # Step 6: Compute q(Y|a)
+    # =============================================================================
+    # Use the components to find q(Y|a)
+    print("p_Y_given_epsilon shape:", p_Y_given_epsilon.shape)  # Debug print statement
+    print("q_epsilon_given_Z_and_A shape:", q_epsilon_given_Z_and_A.shape)  # Debug print statement
+    print("q_Z_given_A shape:", q_Z_given_A.shape)  # Debug print statement
 
-    # # Ensure the dimensions match for matrix multiplication
-    # q_epsilon_given_Z_and_A = q_epsilon_given_Z_and_A[:p_Y_given_epsilon.shape[1], :q_Z_given_A.shape[0]]
+    # Reshape q_Z_given_A to ensure correct matrix multiplication
+    q_Z_given_A_reshaped = q_Z_given_A.T
 
-    # # Use the components to find q(Y|a)
-    # q_Y_given_A = np.dot(np.dot(p_Y_given_epsilon, q_epsilon_given_Z_and_A), q_Z_given_A)
+    if step6_debug:
+        print("q_Z_given_A_reshaped shape:", q_Z_given_A_reshaped.shape)  # Debug print statement
 
-    # if step6_debug:
-    #     # Verify the shape of q_Y_given_A
-    #     assert q_Y_given_A.shape == (p_Y_given_epsilon.shape[0], q_Z_given_A.shape[1]), f"q_Y_given_A shape mismatch: {q_Y_given_A.shape}"
-    #     print("Step 6: q_Y_given_A shape is correct.")
+    # Use the components to find q(Y|a)
+    q_Y_given_A = p_Y_given_epsilon@(q_epsilon_given_Z_and_A@q_Z_given_A_reshaped)
+    print(q_Y_given_A.shape)
 
-    # print("Step 6 done")
+    # Normalize the output to ensure the columns sum to 1
+    q_Y_given_A_normalized = q_Y_given_A / q_Y_given_A.sum(axis=0, keepdims=True)
 
+    if step6_debug:
+        # Verify the shape of q_Y_given_A
+        assert q_Y_given_A_normalized.shape == (num_classes_Y, num_features_A), f"q_Y_given_A shape mismatch: {q_Y_given_A_normalized.shape}"
+        assert np.allclose(q_Y_given_A_normalized.sum(axis=0), 1.0), "q_Y_given_A columns do not sum to 1"
+        print("Step 6: q_Y_given_A shape and sum are correct.")
+
+    print("Step 6 done")
+
+    print(q_Y_given_A_normalized)
 
     # =============================================================================
     # Testing
