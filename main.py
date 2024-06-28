@@ -1,16 +1,25 @@
 import torch
 import numpy as np
-from utils import get_data, get_probabilities, solve_for_q_epsilon_given_ZA, estimate_q_Z_given_A
+from utils import get_data, get_probabilities, estimate_q_Z_given_A, volume_regularized_nmf
 from models import LogisticRegression
 from sklearn.decomposition import NMF  # Placeholder for volmin factorization
 
 def main():
+
+    # =============================================================================
+    # Debugging
+    # =============================================================================
+
+    parameters_debug = False
     step1_debug = False
     step2_debug = False
     step3_debug = False
     step4_debug = False
     step5_debug = False
-    step6_debug = True
+    step6_debug = False
+    testing = False
+    np.random.seed(0)
+    torch.manual_seed(0)
 
     # =============================================================================
     # Parameters
@@ -19,6 +28,15 @@ def main():
     p_target = 0.2
     total = 10
     vec1 = torch.tensor([0.1,0.1,0.4,0.4]) # The probabilities of the four possible values for Z if U = 0 (vec2 if = 1). Just here so we know that Z can be 1-4. 
+
+    # "sklearn" for sklearn's NMF
+    # "volmin_1" for volmin NMF, adapted from https://github.com/kharchenkolab/vrnmf
+    nmf_method = "volmin_1" 
+    # parameters for volmin NMF
+    w_vol = 0.1
+    delta = 1e-8
+    n_iter = 1000
+    err_cut = 1e-8
 
     # Dummy theta matrices for example
     theta_xz = torch.tensor([
@@ -45,11 +63,12 @@ def main():
     source_data, target_data = get_data(theta_xz, theta_yx, theta_yw, p_source, p_target, total)
     Z_source, A_source, W_source, epsilon_source, Y_source = source_data
     Z_target, A_target, W_target, epsilon_target, Y_target = target_data
-    print("Z_source shape:", Z_source.shape)
-    print("A_source shape:", A_source.shape)
-    print("W_source shape:", W_source.shape)
-    print("epsilon_source shape:", epsilon_source.shape)
-    print("Y_source shape:", Y_source.shape)
+    if parameters_debug:
+        print("Z_source shape:", Z_source.shape)
+        print("A_source shape:", A_source.shape)
+        print("W_source shape:", W_source.shape)
+        print("epsilon_source shape:", epsilon_source.shape)
+        print("Y_source shape:", Y_source.shape)
 
     num_classes_Y = Y_source.shape[1]
     num_classes_W = W_source.shape[1]
@@ -75,7 +94,8 @@ def main():
     # Verify the shape of p_Y_given_ZA
     assert p_Y_given_ZA.shape == (num_features_Z, num_features_A, num_classes_Y), f"p_Y_given_ZA shape mismatch: {p_Y_given_ZA.shape}"
     assert np.allclose(p_Y_given_ZA.sum(axis=2), 1.0), "p_Y_given_ZA rows do not sum to 1"
-    print("Step 1: p_Y_given_ZA shape and sum are correct.")
+    if step1_debug:
+        print("Step 1: p_Y_given_ZA shape and sum are correct.")
 
     # Train model to estimate p(W|Z,a)
     model_W = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=W_source.shape[1])
@@ -89,7 +109,8 @@ def main():
     # Verify the shape of p_W_given_ZA
     assert p_W_given_ZA.shape == (num_features_Z, num_features_A, num_classes_W), f"p_W_given_ZA shape mismatch: {p_W_given_ZA.shape}"
     assert np.allclose(p_W_given_ZA.sum(axis=2), 1.0), "p_W_given_ZA rows do not sum to 1"
-    print("Step 1: p_W_given_ZA shape and sum are correct.")
+    if step1_debug:
+        print("Step 1: p_W_given_ZA shape and sum are correct.")
 
     print("STEP 1 DONE")
 
@@ -115,10 +136,16 @@ def main():
     if step2_debug:
         print("num_epsilon", num_epsilon)  # Debug print statement
 
-    # Perform NMF factorization (Placeholder for volmin factorization)
-    nmf = NMF(n_components=num_epsilon, init='random', random_state=0) #n_components is epsilon as it's the inner dimension in the factorisation
-    W = nmf.fit_transform(stacked_matrix)
-    H = nmf.components_
+    # Perform NMF factorization (method depends on nmf_method)
+    # NMF using sklearn.decomposition.NMF
+    if nmf_method == "sklearn":
+        nmf = NMF(n_components=num_epsilon, init='random', random_state=0) #n_components is epsilon as it's the inner dimension in the factorisation
+        W = nmf.fit_transform(stacked_matrix)
+        H = nmf.components_
+
+    # NMF using volmin NMF
+    if nmf_method == "volmin_1":
+        W, H = volume_regularized_nmf(stacked_matrix, num_epsilon, w_vol, delta, n_iter, err_cut)
 
     if step2_debug:
         print("W shape:", W.shape)
@@ -229,9 +256,10 @@ def main():
     # Step 6: Compute q(Y|a)
     # =============================================================================
     # Use the components to find q(Y|a)
-    print("p_Y_given_epsilon shape:", p_Y_given_epsilon.shape)  # Debug print statement
-    print("q_epsilon_given_Z_and_A shape:", q_epsilon_given_Z_and_A.shape)  # Debug print statement
-    print("q_Z_given_A shape:", q_Z_given_A.shape)  # Debug print statement
+    if step6_debug:
+        print("p_Y_given_epsilon shape:", p_Y_given_epsilon.shape)  # Debug print statement
+        print("q_epsilon_given_Z_and_A shape:", q_epsilon_given_Z_and_A.shape)  # Debug print statement
+        print("q_Z_given_A shape:", q_Z_given_A.shape)  # Debug print statement
 
     # Reshape q_Z_given_A to ensure correct matrix multiplication
     q_Z_given_A_reshaped = q_Z_given_A.T
@@ -241,7 +269,8 @@ def main():
 
     # Use the components to find q(Y|a)
     q_Y_given_A = p_Y_given_epsilon@(q_epsilon_given_Z_and_A@q_Z_given_A_reshaped)
-    print(q_Y_given_A.shape)
+    if step6_debug:
+        print(q_Y_given_A.shape)
 
     # Normalize the output to ensure the columns sum to 1
     q_Y_given_A_normalized = q_Y_given_A / q_Y_given_A.sum(axis=0, keepdims=True)
@@ -252,36 +281,38 @@ def main():
         assert np.allclose(q_Y_given_A_normalized.sum(axis=0), 1.0), "q_Y_given_A columns do not sum to 1"
         print("Step 6: q_Y_given_A shape and sum are correct.")
 
-    print("Step 6 done")
+    print("STEP 6 DONE")
 
+    print("Normalised q(Y|a):")
     print(q_Y_given_A_normalized)
 
     # =============================================================================
     # Testing
     # =============================================================================
 
-    # print("Commence Testing...")
+    if testing:
+        print("Commence Testing...")
 
-    # # Print out some samples to verify
-    # print("Source Data Samples:")
-    # print("Z:", Z_source[:5])
-    # print("A:", A_source[:5])
-    # print("W:", W_source[:5])
-    # print("epsilon:", epsilon_source[:5])
-    # print("Y:", Y_source[:5])
-    
-    # print("\nTarget Data Samples:")
-    # print("Z:", Z_target[:5])
-    # print("A:", A_target[:5])
-    # print("W:", W_target[:5])
-    # print("epsilon:", epsilon_target[:5])
-    # print("Y:", Y_target[:5])
+        # Print out some samples to verify
+        print("Source Data Samples:")
+        print("Z:", Z_source[:5])
+        print("A:", A_source[:5])
+        print("W:", W_source[:5])
+        print("epsilon:", epsilon_source[:5])
+        print("Y:", Y_source[:5])
+        
+        print("\nTarget Data Samples:")
+        print("Z:", Z_target[:5])
+        print("A:", A_target[:5])
+        print("W:", W_target[:5])
+        print("epsilon:", epsilon_target[:5])
+        print("Y:", Y_target[:5])
 
-    # # Print the computed q(Y|a)
-    # print("\nComputed q(Y|a):")
-    # print(q_Y_given_A)
+        # Print the computed q(Y|a)
+        print("\nComputed q(Y|a):")
+        print(q_Y_given_A_normalized)
 
-    # print("\nTesting Done")
+        print("\nTesting Done")
 
 if __name__ == "__main__":
     main()
