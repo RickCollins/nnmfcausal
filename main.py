@@ -3,6 +3,7 @@ import numpy as np
 from utils import get_data, get_probabilities, estimate_q_Z_given_A, volume_regularized_nmf
 from models import LogisticRegression
 from sklearn.decomposition import NMF  # Placeholder for volmin factorization
+from volmin_nmf import *
 
 def main():
 
@@ -12,7 +13,7 @@ def main():
 
     parameters_debug = False
     step1_debug = False
-    step2_debug = False
+    step2_debug = True
     step3_debug = False
     step4_debug = False
     step5_debug = False
@@ -27,16 +28,18 @@ def main():
     p_source = 0.98
     p_target = 0.2
     total = 10
+    factorisation_atol = 1e-1
     vec1 = torch.tensor([0.1,0.1,0.4,0.4]) # The probabilities of the four possible values for Z if U = 0 (vec2 if = 1). Just here so we know that Z can be 1-4. 
 
     # "sklearn" for sklearn's NMF
     # "volmin_1" for volmin NMF, adapted from https://github.com/kharchenkolab/vrnmf
-    nmf_method = "volmin_1" 
+    # "volmin_2" for volmin NMF, adapted from https://github.com/bm424/mvcnmf/blob/master/mvcnmf.py
+    nmf_method = "volmin_2" 
     # parameters for volmin NMF
-    w_vol = 0.1
+    w_vol = 0.01
     delta = 1e-8
-    n_iter = 1000
-    err_cut = 1e-8
+    n_iter = 100
+    err_cut = 1e-6
 
     # Dummy theta matrices for example
     theta_xz = torch.tensor([
@@ -130,6 +133,7 @@ def main():
     stacked_matrix = np.vstack((p_Y_given_ZA_matrix, p_W_given_ZA_matrix)) # this should be a |Y| x |Z| matrix stacked on top of a |W| x |Z| matrix (for specific a)
     if step2_debug:
         print("stack_matrix shape",stacked_matrix.shape)  # Debug print statement # so this is like 10 x 4 and 10 x 4 for a 20 x 4 I think.
+        print("stacked_matrix:", stacked_matrix)  # Debug print statement
 
     # Determine the number of components for epsilon
     num_epsilon = min(W_source.shape[1], Z_source.shape[1]) # Remember we need this to be less than the min of |W| and |Z|. Consider changing this as a hyperparameter
@@ -143,9 +147,13 @@ def main():
         W = nmf.fit_transform(stacked_matrix)
         H = nmf.components_
 
-    # NMF using volmin NMF
-    if nmf_method == "volmin_1":
+    # NMF using volmin NMF Method 1
+    elif nmf_method == "volmin_1":
         W, H = volume_regularized_nmf(stacked_matrix, num_epsilon, w_vol, delta, n_iter, err_cut)
+
+    # NMF using volmin NMF Method 2
+    elif nmf_method == "volmin_2":
+        W, H = mvc_nmf(stacked_matrix.T, num_epsilon, w_vol, n_iter, err_cut) # Transpose the matrix to match the input format of the function
 
     if step2_debug:
         print("W shape:", W.shape)
@@ -164,6 +172,9 @@ def main():
         print("p_W_given_epsilon shape:", p_W_given_epsilon.shape)
         print("p_epsilon_given_ZA shape:", p_epsilon_given_ZA.shape)
         print("ZA_source shape:", ZA_source.shape)
+        print("p_Y_given_epsilon:", p_Y_given_epsilon)
+        print("p_W_given_epsilon:", p_W_given_epsilon)
+        print("p_W_given_epsilon marginalised:", np.sum(p_W_given_epsilon, axis=1).reshape(-1, 1))
         # Verify the shapes of the factorized matrices
         assert p_Y_given_epsilon.shape == (num_classes_Y, num_epsilon), f"p_Y_given_epsilon shape mismatch: {p_Y_given_epsilon.shape}" #CHECK NUM_CLASSES_Y IS THE ONE
         assert p_W_given_epsilon.shape == (num_classes_W, num_epsilon), f"p_W_given_epsilon shape mismatch: {p_W_given_epsilon.shape}" #CHECK NUM_CLASSES_W IS THE ONE
@@ -174,7 +185,10 @@ def main():
 
         # Verify reconstruction
         reconstructed_stacked_matrix = np.dot(W, H)
-        assert np.allclose(stacked_matrix, reconstructed_stacked_matrix, atol=1e-2), "Reconstructed matrix is not close to the original"
+        if step2_debug:
+            print("stacked_matrix:", stacked_matrix)
+            print("reconstructed_stacked_matrix:", reconstructed_stacked_matrix)
+        assert np.allclose(stacked_matrix, reconstructed_stacked_matrix, atol = factorisation_atol), "Reconstructed matrix is not close to the original"
         print("Step 2: Reconstruction is correct.")
 
     print("STEP 2 DONE")
