@@ -11,8 +11,8 @@ def main():
     # Debugging
     # =============================================================================
 
-    parameters_debug = False
-    step1_debug = False
+    parameters_debug = True
+    step1_debug = True
     step2_debug = True
     step3_debug = False
     step4_debug = False
@@ -27,9 +27,11 @@ def main():
     # =============================================================================
     p_source = 0.98
     p_target = 0.2
-    total = 10
+    total = 10000
     factorisation_atol = 1e-1
-    vec1 = torch.tensor([0.1,0.1,0.4,0.4]) # The probabilities of the four possible values for Z if U = 0 (vec2 if = 1). Just here so we know that Z can be 1-4. 
+
+    # Step 2 parameters
+    specific_a_index = 0  # First value of A
 
     # "sklearn" for sklearn's NMF
     # "volmin_1" for volmin NMF, adapted from https://github.com/kharchenkolab/vrnmf
@@ -64,14 +66,17 @@ def main():
     ])
 
     source_data, target_data = get_data(theta_xz, theta_yx, theta_yw, p_source, p_target, total)
-    Z_source, A_source, W_source, epsilon_source, Y_source = source_data
-    Z_target, A_target, W_target, epsilon_target, Y_target = target_data
+    Z_source, epsilon_source, W_source, A_source, Y_source = source_data
+    Z_target, epsilon_target, W_target, A_target, Y_target = target_data
     if parameters_debug:
         print("Z_source shape:", Z_source.shape)
         print("A_source shape:", A_source.shape)
         print("W_source shape:", W_source.shape)
         print("epsilon_source shape:", epsilon_source.shape)
         print("Y_source shape:", Y_source.shape)
+        print("Y_source:", Y_source)
+        print("A_source:", A_source)
+        print("epsilon_source:", epsilon_source)
 
     num_classes_Y = Y_source.shape[1]
     num_classes_W = W_source.shape[1]
@@ -84,9 +89,10 @@ def main():
 
     # Train model to estimate p(Y|Z,a)
     # By stacking with A, we condition on A by including all values of A in the input
-    ZA_source = np.hstack((Z_source, A_source))  # We go from 4 features to 4 + 1 = 5 features
+    ZA_source = np.hstack((Z_source, A_source))  # We go from 4 features to 4 + 4 = 8 features
     if step1_debug:
         print("ZA_source.shape", ZA_source.shape)  # Debug print statement
+        print("ZA_source", ZA_source)  # Debug print statement
     model_Y = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=Y_source.shape[1])
     model_Y.train(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
     p_Y_given_ZA = get_probabilities(model_Y, Z_source, A_source)
@@ -121,9 +127,14 @@ def main():
     # Step 2: Factorize[p(Y|Z,a); p(W|Z,a)] into [p(Y| \Epsilon,a); p(W| \Epsilon)] and p(\Epsilon | Z,a), using volmin
     # =============================================================================
 
-    # extract the matrices from the previous outputs p_Y_given_ZA and p_W_given_ZA
-    p_Y_given_ZA_matrix = p_Y_given_ZA.reshape(num_features_Z, num_classes_Y)
-    p_W_given_ZA_matrix = p_W_given_ZA.reshape(num_features_Z, num_classes_W)
+    # extract the matrices from the previous outputs p_Y_given_ZA and p_W_given_ZA.
+    # We do this for a specific value of a, so we can just take the first value of A for now. 
+    # specific_a_index is a parameter that can be changed at the top to get the factorization for a different value of a.
+
+    p_Y_given_ZA_matrix = p_Y_given_ZA[:, specific_a_index, :]
+    p_W_given_ZA_matrix = p_W_given_ZA[:, specific_a_index, :]
+    #p_Y_given_ZA_matrix = p_Y_given_ZA.reshape(num_features_Z, num_classes_Y) 
+    #p_W_given_ZA_matrix = p_W_given_ZA.reshape(num_features_Z, num_classes_W) 
     if step2_debug:
         print("p_Y_given_ZA_matrix shape:", p_Y_given_ZA_matrix.shape)  # Debug print statement
         print("p_W_given_ZA_matrix shape:", p_W_given_ZA_matrix.shape)  # Debug print statement
@@ -136,7 +147,7 @@ def main():
         print("stacked_matrix:", stacked_matrix)  # Debug print statement
 
     # Determine the number of components for epsilon
-    num_epsilon = min(W_source.shape[1], Z_source.shape[1]) # Remember we need this to be less than the min of |W| and |Z|. Consider changing this as a hyperparameter
+    num_epsilon = 2 # min(W_source.shape[1], Z_source.shape[1]) # Remember we need this to be less than the min of |W| and |Z|. Consider changing this as a hyperparameter
     if step2_debug:
         print("num_epsilon", num_epsilon)  # Debug print statement
 
@@ -148,8 +159,8 @@ def main():
         H = nmf.components_
 
     # NMF using volmin NMF Method 1
-    elif nmf_method == "volmin_1":
-        W, H = volume_regularized_nmf(stacked_matrix, num_epsilon, w_vol, delta, n_iter, err_cut)
+    #elif nmf_method == "volmin_1":
+       # W, H = volume_regularized_nmf(stacked_matrix, num_epsilon, w_vol, delta, n_iter, err_cut)
 
     # NMF using volmin NMF Method 2
     elif nmf_method == "volmin_2":
@@ -162,8 +173,8 @@ def main():
         print("H:", H)
 
     # Extract the factorized matrices
-    p_Y_given_epsilon = W[:num_classes_Y, :] # |Y| x |\Epsilon| matrix for specific a #CHECK NUM_CLASSES_Y IS THE ONE
-    p_W_given_epsilon = W[num_classes_Y:, :] # |W| x |\Epsilon| matrix for specific a #CHECK NUM_CLASSES_Y IS THE ONE
+    p_Y_given_epsilon = W[:num_classes_Y, :] # |Y| x |\Epsilon| matrix for specific a, the first num_classes_Y rows #CHECK NUM_CLASSES_Y IS THE ONE
+    p_W_given_epsilon = W[num_classes_Y:, :] # |W| x |\Epsilon| matrix for specific a, the rest of the rows #CHECK NUM_CLASSES_Y IS THE ONE
     p_epsilon_given_ZA = H # |\Epsilon| x |Z| matrix for specific a
 
     if step2_debug:
@@ -173,8 +184,8 @@ def main():
         print("p_epsilon_given_ZA shape:", p_epsilon_given_ZA.shape)
         print("ZA_source shape:", ZA_source.shape)
         print("p_Y_given_epsilon:", p_Y_given_epsilon)
-        print("p_W_given_epsilon:", p_W_given_epsilon)
-        print("p_W_given_epsilon marginalised:", np.sum(p_W_given_epsilon, axis=1).reshape(-1, 1))
+        print("p_W_given_epsilon (should be comparable to vec1 and vec2):", p_W_given_epsilon)
+        #print("p_W_given_epsilon marginalised:", np.sum(p_W_given_epsilon, axis=1).reshape(-1, 1))
         # Verify the shapes of the factorized matrices
         assert p_Y_given_epsilon.shape == (num_classes_Y, num_epsilon), f"p_Y_given_epsilon shape mismatch: {p_Y_given_epsilon.shape}" #CHECK NUM_CLASSES_Y IS THE ONE
         assert p_W_given_epsilon.shape == (num_classes_W, num_epsilon), f"p_W_given_epsilon shape mismatch: {p_W_given_epsilon.shape}" #CHECK NUM_CLASSES_W IS THE ONE
