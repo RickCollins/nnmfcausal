@@ -29,7 +29,7 @@ def main():
     # =============================================================================
     p_source = 0.8
     p_target = 0.2
-    total = 1000
+    total = 100
     factorisation_atol = 1e-1
 
     # Step 2 parameters
@@ -47,10 +47,10 @@ def main():
 
     # Dummy theta matrices for example
     theta_xz = torch.tensor([
-        [0.5, 0.2, 0.2, 0.1],
-        [0.1, 0.5, 0.2, 0.2],
-        [0.2, 0.1, 0.5, 0.2],
-        [0.2, 0.2, 0.1, 0.5]
+        [0.2, 0.3, 0.4, 0.1],
+        [0.1, 0.3, 0.5, 0.1],
+        [0.3, 0.2, 0.1, 0.4],
+        [0.4, 0.2, 0.2, 0.2]
     ])
 
     theta_yx = torch.tensor([
@@ -76,10 +76,11 @@ def main():
         print("W_source shape:", W_source.shape)
         print("epsilon_source shape:", epsilon_source.shape)
         print("Y_source shape:", Y_source.shape)
-        print("Y_source:", Y_source)
+        print("Z_source:", Z_source)
         print("A_source:", A_source)
         print("W_source:", W_source)
         print("epsilon_source:", epsilon_source)
+        print("Y_source:", Y_source)
 
     
     num_classes_Y = Y_source.shape[1]
@@ -103,7 +104,7 @@ def main():
 
     ############### LOGISTIC REGRESSION VERSION ###############
 
-    model_Y = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=Y_source.shape[1])
+    model_Y = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=2)
     model_Y.train(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
     p_Y_given_ZA = get_probabilities(model_Y, Z_source, A_source)
 

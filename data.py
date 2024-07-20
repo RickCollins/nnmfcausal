@@ -16,12 +16,14 @@ def get_tuple(theta_xz,theta_yx,theta_yw,p=0.2):
     proby = (vec1 * U + vec2 * (1-U)).unsqueeze(0)
 
     probx = probx * (theta_xz @ z.T).T
+    #print(probx)
     x = torch.nn.functional.one_hot(torch.distributions.categorical.Categorical(probx).sample().long(), num_classes = 4).float()
+    #print(x)
     # x = torch.nn.functional.one_hot(torch.argmax(probx, dim=1).long(), num_classes = 4).float()
 
     proby = proby * (theta_yx @ x.T + theta_yw @ w.T).T
-    y = torch.nn.functional.one_hot(torch.distributions.categorical.Categorical(proby).sample().long(), num_classes = 4).float()
-    # y = torch.nn.functional.one_hot(torch.argmax(proby).long(), num_classes = 4).float()
+    y_prob = proby.sum(dim=1)
+    y = (y_prob > 0.5).float().unsqueeze(0)
 
     return U,z,w,x,y
 

@@ -55,9 +55,12 @@ def get_probabilities(model, Z, A):
         for a in possible_A:
             ZA = np.hstack((z.reshape(1, -1), a.reshape(1, -1)))
             ZA_tensor = torch.tensor(ZA, dtype=torch.float32)
+            print(ZA_tensor)
             with torch.no_grad():
                 probs = model(ZA_tensor)
-                probs = torch.softmax(probs, dim=1).numpy()
+                print(probs)
+                probs = torch.sigmoid(probs).numpy()
+                print(probs)
                 probabilities.append(probs)
     
     probabilities = np.array(probabilities).reshape((num_Z, num_A, num_classes))
