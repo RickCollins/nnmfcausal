@@ -15,13 +15,13 @@ def main():
     parameters_debug = True
     step1_debug = True
     step2_debug = True
-    step3_debug = True
+    step3_debug = False
     step4_debug = False
     step5_debug = False
     step6_debug = False
     testing = False
     parameter_tuning = False
-    np.random.seed(0)
+    np.random.seed(1)
     torch.manual_seed(0)
 
     # =============================================================================
@@ -29,7 +29,7 @@ def main():
     # =============================================================================
     p_source = 0.8
     p_target = 0.2
-    total = 1000
+    total = 10
     factorisation_atol = 1e-1
 
     # Step 2 parameters
@@ -46,11 +46,18 @@ def main():
     err_cut = 1e-8
 
     # Dummy theta matrices for example
+    #theta_xz = torch.tensor([
+    #    [1.0, 0.0, 0.0, 0.0],
+    #     [0.0, 1.0, 0.0, 0.0],
+    #     [0.0, 0.0, 1.0, 0.0],
+    #     [0.0, 0.0, 0.0, 1.0] 
+    # ])
+
     theta_xz = torch.tensor([
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0]
+        [0.5, 0.2, 0.2, 0.1],
+        [0.1, 0.5, 0.2, 0.2],
+        [0.2, 0.1, 0.5, 0.2],
+        [0.2, 0.2, 0.1, 0.5]
     ])
 
     theta_yx = torch.tensor([
@@ -76,10 +83,11 @@ def main():
         print("W_source shape:", W_source.shape)
         print("epsilon_source shape:", epsilon_source.shape)
         print("Y_source shape:", Y_source.shape)
-        print("Y_source:", Y_source)
+        print("Z_source:", Z_source)
         print("A_source:", A_source)
         print("W_source:", W_source)
         print("epsilon_source:", epsilon_source)
+        print("Y_source:", Y_source)
 
     
     num_classes_Y = Y_source.shape[1]
