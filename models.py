@@ -23,8 +23,14 @@ class LogisticRegression(nn.Module):
         self.to(device) 
         #self.linear.weight.data = torch.linalg.solve(X.T@X, X.T@Y).T
         #new part - due to singular matrix
-        XTX = X.T @ X + 1e-3 * torch.eye(X.shape[1], device=device)
-        self.linear.weight.data = torch.linalg.solve(XTX, X.T @ Y).T
+
+        ####### ORIGINAL ########
+        #XTX = X.T @ X + 1e-3 * torch.eye(X.shape[1], device=device)
+        #self.linear.weight.data = torch.linalg.solve(XTX, X.T @ Y).T
+
+        ######## PINV ########
+        X_pinv = torch.linalg.pinv(X.T @ X)
+        self.linear.weight.data = (X_pinv @ X.T @ Y).T
 
     def eval(self, X, Y):
         correct = 0

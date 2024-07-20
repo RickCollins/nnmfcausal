@@ -1,9 +1,10 @@
 import torch
 import numpy as np
 from utils import get_data, get_probabilities, estimate_q_Z_given_A, volume_regularized_nmf
-from models import LogisticRegression
+from models import LogisticRegression, COVAR
 from sklearn.decomposition import NMF  # Placeholder for volmin factorization
 from volmin_nmf import *
+from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
 
 def main():
 
@@ -14,20 +15,21 @@ def main():
     parameters_debug = True
     step1_debug = True
     step2_debug = True
-    step3_debug = False
+    step3_debug = True
     step4_debug = False
     step5_debug = False
     step6_debug = False
     testing = False
+    parameter_tuning = False
     np.random.seed(0)
     torch.manual_seed(0)
 
     # =============================================================================
     # Parameters
     # =============================================================================
-    p_source = 0.98
+    p_source = 0.8
     p_target = 0.2
-    total = 10000
+    total = 1000
     factorisation_atol = 1e-1
 
     # Step 2 parameters
@@ -38,10 +40,10 @@ def main():
     # "volmin_2" for volmin NMF, adapted from https://github.com/bm424/mvcnmf/blob/master/mvcnmf.py
     nmf_method = "volmin_2" 
     # parameters for volmin NMF
-    w_vol = 0.01
+    w_vol = 5
     delta = 1e-8
-    n_iter = 100
-    err_cut = 1e-6
+    n_iter = 100000
+    err_cut = 1e-8
 
     # Dummy theta matrices for example
     theta_xz = torch.tensor([
@@ -76,12 +78,17 @@ def main():
         print("Y_source shape:", Y_source.shape)
         print("Y_source:", Y_source)
         print("A_source:", A_source)
+        print("W_source:", W_source)
         print("epsilon_source:", epsilon_source)
 
+    
     num_classes_Y = Y_source.shape[1]
     num_classes_W = W_source.shape[1]
     num_features_Z = Z_source.shape[1]
     num_features_A = A_source.shape[1]
+
+    sum_epsilon = np.sum(epsilon_source)
+    print("Sum of epsilon_source:", sum_epsilon.item())
 
     # =============================================================================
     # Step 1: Estimate p(Y|Z,a) and p(W|Z,a)
@@ -93,9 +100,23 @@ def main():
     if step1_debug:
         print("ZA_source.shape", ZA_source.shape)  # Debug print statement
         print("ZA_source", ZA_source)  # Debug print statement
+
+    ############### LOGISTIC REGRESSION VERSION ###############
+
     model_Y = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=Y_source.shape[1])
     model_Y.train(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
     p_Y_given_ZA = get_probabilities(model_Y, Z_source, A_source)
+
+    ############### SKLEARN VERSION ###############
+
+    # model_Y = SklearnLogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=200)
+    # model_Y.fit(ZA_source, np.argmax(Y_source, axis=1))
+    # Y_train_pred = model_Y.predict(ZA_source)
+    # Y_train_true = np.argmax(Y_source, axis=1)
+    # accuracy_Y_train = np.mean(Y_train_pred == Y_train_true)
+    # print(f"Accuracy of model_Y on training set: {accuracy_Y_train:.4f}")
+    # p_Y_given_ZA = model_Y.predict_proba(ZA_source).reshape(num_features_Z, num_features_A, num_classes_Y)
+
     if step1_debug:
         print("p_Y_given_ZA", p_Y_given_ZA)
         print("p_Y_given_ZA shape:", p_Y_given_ZA.shape)  # Debug print statement
@@ -106,10 +127,22 @@ def main():
     if step1_debug:
         print("Step 1: p_Y_given_ZA shape and sum are correct.")
 
-    # Train model to estimate p(W|Z,a)
+    ############### LOGISTIC REGRESSION VERSION ###############
+    #Train model to estimate p(W|Z,a)
     model_W = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=W_source.shape[1])
     model_W.train(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(W_source, dtype=torch.float32))
+    
     p_W_given_ZA = get_probabilities(model_W, Z_source, A_source)
+
+    ############### SKLEARN VERSION ###############
+
+    # model_W = SklearnLogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=200)
+    # model_W.fit(ZA_source, np.argmax(W_source, axis=1))
+    # W_train_pred = model_W.predict(ZA_source)
+    # W_train_true = np.argmax(W_source, axis=1)
+    # accuracy_W_train = np.mean(W_train_pred == W_train_true)
+    # print(f"Accuracy of model_W on training set: {accuracy_W_train:.4f}")
+    # p_W_given_ZA = model_W.predict_proba(ZA_source).reshape(num_features_Z, num_features_A, num_classes_W)
 
     if step1_debug:
         print("p_W_given_ZA shape:", p_W_given_ZA.shape)  # Debug print statement
@@ -120,6 +153,12 @@ def main():
     assert np.allclose(p_W_given_ZA.sum(axis=2), 1.0), "p_W_given_ZA rows do not sum to 1"
     if step1_debug:
         print("Step 1: p_W_given_ZA shape and sum are correct.")
+
+    
+    accuracy_Y = model_Y.eval(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
+    accuracy_W = model_W.eval(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(W_source, dtype=torch.float32))
+    print(f"Accuracy of model_Y: {accuracy_Y}")
+    print(f"Accuracy of model_W: {accuracy_W}")
 
     print("STEP 1 DONE")
 
@@ -142,6 +181,7 @@ def main():
         print("p_W_given_ZA_matrix:", p_W_given_ZA_matrix)  # Debug print statement
     # Stack the probability matrices
     stacked_matrix = np.vstack((p_Y_given_ZA_matrix, p_W_given_ZA_matrix)) # this should be a |Y| x |Z| matrix stacked on top of a |W| x |Z| matrix (for specific a)
+    stacked_matrix = stacked_matrix / stacked_matrix.sum(axis=0, keepdims=True) # Normalise the matrix #CHECK THIS
     if step2_debug:
         print("stack_matrix shape",stacked_matrix.shape)  # Debug print statement # so this is like 10 x 4 and 10 x 4 for a 20 x 4 I think.
         print("stacked_matrix:", stacked_matrix)  # Debug print statement
@@ -171,6 +211,30 @@ def main():
         print("H shape:", H.shape)
         print("W:", W)
         print("H:", H)
+    
+    ######### parameter tuning start #########
+    if parameter_tuning:
+        param_grid = {
+        'w_vol': [0.01, 0.1, 0.5, 10],
+        'n_iter': [1000, 10000],
+        'err_cut': [1e-4, 1e-6, 1e-8]
+    }
+        for w_vol in param_grid['w_vol']:
+            for n_iter in param_grid['n_iter']:
+                for err_cut in param_grid['err_cut']:
+                    p_Y_given_ZA_matrix = p_Y_given_ZA[:, specific_a_index, :]
+                    p_W_given_ZA_matrix = p_W_given_ZA[:, specific_a_index, :]
+                    
+                    W, H = mvc_nmf(stacked_matrix.T, num_epsilon, w_vol, n_iter, err_cut) # Transpose the matrix to match the input format of the function
+                    
+                    # Here you can define your metric to compare W with vec1 and vec2
+                    # For now, we will just print the matrices
+                    print(f"Parameters: w_vol={w_vol}, n_iter={n_iter}, err_cut={err_cut}")
+                    print("p_W_given_epsilon:", W[num_classes_Y:, :])
+
+    ######### parameter tuning end #########
+
+
 
     # Extract the factorized matrices
     p_Y_given_epsilon = W[:num_classes_Y, :] # |Y| x |\Epsilon| matrix for specific a, the first num_classes_Y rows #CHECK NUM_CLASSES_Y IS THE ONE
