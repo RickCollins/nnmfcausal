@@ -8,13 +8,23 @@ import numpy as np
 
 from sklearn.decomposition import PCA
 
+# SVD Initialization
+from sklearn.utils.extmath import randomized_svd
+
 # =============================================================================
 # Parameters
 # =============================================================================
 
-fit_tolerance=1e-2
+#fit_tolerance=1e-2
+#convergence_tolerance=1e-6
+#learning_rate=0.5 #changed this from 1000
+#scaling=0.9
+#learning_tolerance=1e-4
+#max_iter=1000
+
+fit_tolerance=1e-4
 convergence_tolerance=1e-6
-learning_rate=0.5 #changed this from 1000
+learning_rate=0.1 #changed this from 1000
 scaling=0.9
 learning_tolerance=1e-4
 max_iter=10000
@@ -236,8 +246,20 @@ class MVCNMF:
         self.U_bar = PCA(n_components=self.c-1).fit(self.augment(X).T).components_.T
         #S = np.zeros((self.c, X.shape[1]))
         #A = X[:, np.random.randint(0, X.shape[1], size=self.c)]
-        S = np.random.rand(self.c, X.shape[1]) * 0.1  # Initialize S with small random values
-        A = np.random.rand(X.shape[0], self.c) * 0.1  # Initialize A with small random values
+
+        # Random Initialization
+        #S = np.random.rand(self.c, X.shape[1]) * 0.1  # Initialize S with small random values
+        #A = np.random.rand(X.shape[0], self.c) * 0.1  # Initialize A with small random values
+
+        # SVD Initialization
+        U, Sigma, VT = randomized_svd(X, n_components=self.c, random_state=0)
+        W_init = np.dot(U, np.diag(Sigma))
+        H_init = VT
+
+        # Initialize the matrices A and S using SVD components
+        S = H_init * 0.1  # Initialize S with scaled SVD components
+        A = W_init * 0.1  # Initialize A with scaled SVD components
+
         iterator = range(max_iter)
         o = 0
         for iteration in iterator:
