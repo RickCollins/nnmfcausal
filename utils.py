@@ -58,11 +58,12 @@ def get_probabilities(model, Z, A):
             with torch.no_grad():
                 probs = model(ZA_tensor)
                 probs = torch.softmax(probs, dim=1).numpy()
-                probabilities.append(probs)
+                probabilities.append(probs[0])
     
     probabilities = np.array(probabilities).reshape((num_Z, num_A, num_classes))
     
     return probabilities
+
 
 def estimate_q_Z_given_A(model, A, num_classes_Z, num_features_A):
     """
