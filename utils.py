@@ -57,11 +57,47 @@ def get_probabilities(model, Z, A):
             ZA_tensor = torch.tensor(ZA, dtype=torch.float32)
             print(ZA_tensor)
             with torch.no_grad():
+                logits = model(ZA_tensor)
+                print(logits)
+                prob_1 = torch.sigmoid(logits).numpy()[0][0]  # Probability of class 1
+                prob_0 = 1 - prob_1  # Probability of class 0
+                print([prob_0, prob_1])
+                probabilities.append([prob_0, prob_1])
+    
+    probabilities = np.array(probabilities).reshape((num_Z, num_A, 2))
+    
+    return probabilities
+
+def get_probabilities_one_hot(model, Z, A):
+    """
+    Computes the softmax probabilities from the trained model.
+    
+    Args:
+        model (model): Trained model.
+        Z (numpy.ndarray): Feature matrix Z.
+        A (numpy.ndarray): Feature matrix A.
+
+    Returns:
+        numpy.ndarray: Probability matrix reshaped to (|Z|, |A|, |Y|) or (|Z|, |A|, |W|).
+    """
+    num_Z = Z.shape[1]
+    num_A = A.shape[1]
+    num_classes = model.linear.out_features
+
+    # Generate all possible one-hot vectors for Z
+    possible_Z = np.eye(num_Z)
+    possible_A = np.eye(num_A)
+    
+    probabilities = []
+    
+    for z in possible_Z:
+        for a in possible_A:
+            ZA = np.hstack((z.reshape(1, -1), a.reshape(1, -1)))
+            ZA_tensor = torch.tensor(ZA, dtype=torch.float32)
+            with torch.no_grad():
                 probs = model(ZA_tensor)
-                print(probs)
-                probs = torch.sigmoid(probs).numpy()
-                print(probs)
-                probabilities.append(probs)
+                probs = torch.softmax(probs, dim=1).numpy()
+                probabilities.append(probs[0])
     
     probabilities = np.array(probabilities).reshape((num_Z, num_A, num_classes))
     

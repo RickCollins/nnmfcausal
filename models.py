@@ -1,6 +1,7 @@
 import torch 
 
 import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
@@ -41,6 +42,46 @@ class LogisticRegression(nn.Module):
                 correct+=1
 
         return correct/total
+    
+
+class LogisticRegressionGD(nn.Module):
+    def __init__(self, input_dim, num_classes):
+        super(LogisticRegressionGD, self).__init__()
+        self.linear = nn.Linear(input_dim, num_classes)
+
+    def forward(self, x):
+        return self.linear(x)
+
+    def train_model(self, X, Y, learning_rate=0.01, epochs=100, batch_size=32, verbose=False, device='cpu'):
+        self.to(device)
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(self.parameters(), lr=learning_rate)
+        
+        dataset = torch.utils.data.TensorDataset(X, Y)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        
+        for epoch in range(epochs):
+            for batch_X, batch_Y in dataloader:
+                batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
+                
+                optimizer.zero_grad()
+                outputs = self(batch_X)
+                loss = criterion(outputs, torch.argmax(batch_Y, dim=1))
+                loss.backward()
+                optimizer.step()
+                
+            if verbose and (epoch+1) % 10 == 0:
+                print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+
+    def eval_model(self, X, Y):
+        with torch.no_grad():
+            outputs = self(X)
+            _, predicted = torch.max(outputs, 1)
+            _, labels = torch.max(Y, 1)
+            total = labels.size(0)
+            correct = (predicted == labels).sum().item()
+        
+        return correct / total
 
 
 ##############################################

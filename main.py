@@ -1,7 +1,7 @@
 import torch
 import numpy as np
-from utils import get_data, get_probabilities, estimate_q_Z_given_A, volume_regularized_nmf
-from models import LogisticRegression, COVAR
+from utils import get_data, get_probabilities, estimate_q_Z_given_A, get_probabilities_one_hot
+from models import LogisticRegression, COVAR, LogisticRegressionGD
 from sklearn.decomposition import NMF  # Placeholder for volmin factorization
 from volmin_nmf import *
 from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
@@ -29,7 +29,7 @@ def main():
     # =============================================================================
     p_source = 0.8
     p_target = 0.2
-    total = 100
+    total = 5000
     factorisation_atol = 1e-1
 
     # Step 2 parameters
@@ -83,7 +83,7 @@ def main():
         print("Y_source:", Y_source)
 
     
-    num_classes_Y = Y_source.shape[1]
+    num_classes_Y = 2 #AMEND THIS???????????????????????????????
     num_classes_W = W_source.shape[1]
     num_features_Z = Z_source.shape[1]
     num_features_A = A_source.shape[1]
@@ -104,19 +104,25 @@ def main():
 
     ############### LOGISTIC REGRESSION VERSION ###############
 
-    model_Y = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=2)
-    model_Y.train(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
-    p_Y_given_ZA = get_probabilities(model_Y, Z_source, A_source)
+    #model_Y = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=2)
+    #model_Y.train(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
+
+    # model_Y = LogisticRegressionGD(input_dim=ZA_source.shape[1], num_classes=Y_source.shape[1])
+    # model_Y.train_model(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32), learning_rate=0.01, epochs=100, verbose=True)
+    # p_Y_given_ZA = get_probabilities(model_Y, Z_source, A_source)
 
     ############### SKLEARN VERSION ###############
 
-    # model_Y = SklearnLogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=200)
-    # model_Y.fit(ZA_source, np.argmax(Y_source, axis=1))
-    # Y_train_pred = model_Y.predict(ZA_source)
-    # Y_train_true = np.argmax(Y_source, axis=1)
-    # accuracy_Y_train = np.mean(Y_train_pred == Y_train_true)
-    # print(f"Accuracy of model_Y on training set: {accuracy_Y_train:.4f}")
-    # p_Y_given_ZA = model_Y.predict_proba(ZA_source).reshape(num_features_Z, num_features_A, num_classes_Y)
+    print(Y_source.flatten())
+    model_Y = SklearnLogisticRegression(max_iter=1000)
+    model_Y.fit(ZA_source, Y_source.flatten())
+    print(ZA_source)
+    print(Y_source.flatten())
+    Y_train_pred = model_Y.predict(ZA_source)
+    Y_train_true = np.argmax(Y_source, axis=1)
+    accuracy_Y_train = np.mean(Y_train_pred == Y_train_true)
+    print(f"Accuracy of model_Y on training set: {accuracy_Y_train:.4f}")
+    p_Y_given_ZA = model_Y.predict_proba(ZA_source).reshape(num_features_Z, num_features_A, num_classes_Y)
 
     if step1_debug:
         print("p_Y_given_ZA", p_Y_given_ZA)
@@ -130,10 +136,10 @@ def main():
 
     ############### LOGISTIC REGRESSION VERSION ###############
     #Train model to estimate p(W|Z,a)
-    model_W = LogisticRegression(input_dim=ZA_source.shape[1], num_classes=W_source.shape[1])
-    model_W.train(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(W_source, dtype=torch.float32))
+    model_W = LogisticRegressionGD(input_dim=ZA_source.shape[1], num_classes=W_source.shape[1])
+    model_W.train_model(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32), learning_rate=0.01, epochs=100, verbose=True)
     
-    p_W_given_ZA = get_probabilities(model_W, Z_source, A_source)
+    p_W_given_ZA = get_probabilities_one_hot(model_W, Z_source, A_source)
 
     ############### SKLEARN VERSION ###############
 
@@ -156,8 +162,8 @@ def main():
         print("Step 1: p_W_given_ZA shape and sum are correct.")
 
     
-    accuracy_Y = model_Y.eval(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
-    accuracy_W = model_W.eval(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(W_source, dtype=torch.float32))
+    accuracy_Y = model_Y.eval_model(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(Y_source, dtype=torch.float32))
+    accuracy_W = model_W.eval_model(torch.tensor(ZA_source, dtype=torch.float32), torch.tensor(W_source, dtype=torch.float32))
     print(f"Accuracy of model_Y: {accuracy_Y}")
     print(f"Accuracy of model_W: {accuracy_W}")
 
