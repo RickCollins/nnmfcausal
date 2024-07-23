@@ -1,10 +1,11 @@
 import torch
 import numpy as np
-from data import get_dataset
+from data import get_dataset, get_dataset_new
 from scipy.linalg import sqrtm, det, pinv
 from sklearn.decomposition import NMF
+import matplotlib.pyplot as plt
 
-def get_data(theta_xz, theta_yx, theta_yw, p_source, p_target, total):
+def get_data(theta_a_z, theta_y_a, theta_y_w, p_source, p_target, total):
     """
     Generates datasets for source and target distributions.
     
@@ -20,10 +21,34 @@ def get_data(theta_xz, theta_yx, theta_yw, p_source, p_target, total):
         tuple: Two tuples containing the source and target datasets respectively.
     """
     # Source distribution data
-    U_source, Z_source, W_source, X_source, Y_source = get_dataset(theta_xz, theta_yx, theta_yw, p_source, total)
+    U_source, Z_source, W_source, X_source, Y_source = get_dataset(theta_a_z,theta_y_a,theta_y_w, p_source, total)
     
     # Target distribution data
-    U_target, Z_target, W_target, X_target, Y_target = get_dataset(theta_xz, theta_yx, theta_yw, p_target, total)
+    U_target, Z_target, W_target, X_target, Y_target = get_dataset(theta_a_z,theta_y_a,theta_y_w, p_target, total)
+    
+    return (Z_source.numpy(), U_source.numpy(), W_source.numpy(), X_source.numpy(), Y_source.numpy()), \
+           (Z_target.numpy(), U_target.numpy(), W_target.numpy(), X_target.numpy(), Y_target.numpy())
+
+def get_data_new(theta_a_z, theta_y_a, theta_y_w, theta_y_epsilon, theta_a_epsilon, p_source, p_target, total):
+    """
+    Generates datasets for source and target distributions.
+    
+    Args:
+        theta_xz (torch.Tensor): Transformation matrix for X given Z.
+        theta_yx (torch.Tensor): Transformation matrix for Y given X.
+        theta_yw (torch.Tensor): Transformation matrix for Y given W.
+        p_source (float): Probability parameter for the source distribution.
+        p_target (float): Probability parameter for the target distribution.
+        total (int): Total number of samples to generate.
+
+    Returns:
+        tuple: Two tuples containing the source and target datasets respectively.
+    """
+    # Source distribution data
+    U_source, Z_source, W_source, X_source, Y_source = get_dataset_new(theta_a_z, theta_y_a, theta_y_w, theta_y_epsilon, theta_a_epsilon, p_source, total)
+    
+    # Target distribution data
+    U_target, Z_target, W_target, X_target, Y_target = get_dataset_new(theta_a_z, theta_y_a, theta_y_w, theta_y_epsilon, theta_a_epsilon, p_target, total)
     
     return (Z_source.numpy(), U_source.numpy(), W_source.numpy(), X_source.numpy(), Y_source.numpy()), \
            (Z_target.numpy(), U_target.numpy(), W_target.numpy(), X_target.numpy(), Y_target.numpy())
@@ -83,6 +108,41 @@ def get_probabilities_one_hot(model, Z, A):
     num_Z = Z.shape[1]
     num_A = A.shape[1]
     num_classes = model.linear.out_features
+
+    # Generate all possible one-hot vectors for Z
+    possible_Z = np.eye(num_Z)
+    possible_A = np.eye(num_A)
+    
+    probabilities = []
+    
+    for z in possible_Z:
+        for a in possible_A:
+            ZA = np.hstack((z.reshape(1, -1), a.reshape(1, -1)))
+            ZA_tensor = torch.tensor(ZA, dtype=torch.float32)
+            with torch.no_grad():
+                probs = model(ZA_tensor)
+                probs = torch.softmax(probs, dim=1).numpy()
+                probabilities.append(probs[0])
+    
+    probabilities = np.array(probabilities).reshape((num_Z, num_A, num_classes))
+    
+    return probabilities
+
+def get_probabilities_one_hot_nn(model, Z, A):
+    """
+    Computes the softmax probabilities from the trained model.
+    
+    Args:
+        model (model): Trained model.
+        Z (numpy.ndarray): Feature matrix Z.
+        A (numpy.ndarray): Feature matrix A.
+
+    Returns:
+        numpy.ndarray: Probability matrix reshaped to (|Z|, |A|, |Y|) or (|Z|, |A|, |W|).
+    """
+    num_Z = Z.shape[1]
+    num_A = A.shape[1]
+    num_classes = model.fc3.out_features
 
     # Generate all possible one-hot vectors for Z
     possible_Z = np.eye(num_Z)
@@ -394,3 +454,46 @@ def volnmf_main(vol, B, volnmf=None, n_comp=3, n_reduce=None,
         'C_rand': C_rand, 'R_rand': R_rand, 'Q_rand': Q_rand,
         'rec': vol_solution['info_record']
     }
+
+def plot_histograms(source_data):
+    Z_source, epsilon_source, W_source, A_source, Y_source = source_data
+
+    # Convert tensors to numpy arrays
+    Z_source_np = Z_source.numpy()
+    epsilon_source_np = epsilon_source.numpy()
+    W_source_np = W_source.numpy()
+    A_source_np = A_source.numpy()
+    Y_source_np = Y_source.numpy()
+
+    # Flatten the arrays for histogram plotting
+    Z_source_flat = Z_source_np.flatten()
+    epsilon_source_flat = epsilon_source_np.flatten()
+    W_source_flat = W_source_np.flatten()
+    A_source_flat = A_source_np.flatten()
+    Y_source_flat = Y_source_np.flatten()
+
+    # Plot histograms
+    plt.figure(figsize=(15, 10))
+
+    plt.subplot(2, 3, 1)
+    plt.hist(Z_source_flat, bins=20, color='blue', alpha=0.7)
+    plt.title('Histogram of Z_source')
+
+    plt.subplot(2, 3, 2)
+    plt.hist(epsilon_source_flat, bins=20, color='green', alpha=0.7)
+    plt.title('Histogram of epsilon_source')
+
+    plt.subplot(2, 3, 3)
+    plt.hist(W_source_flat, bins=20, color='red', alpha=0.7)
+    plt.title('Histogram of W_source')
+
+    plt.subplot(2, 3, 4)
+    plt.hist(A_source_flat, bins=20, color='purple', alpha=0.7)
+    plt.title('Histogram of A_source')
+
+    plt.subplot(2, 3, 5)
+    plt.hist(Y_source_flat, bins=20, color='orange', alpha=0.7)
+    plt.title('Histogram of Y_source')
+
+    plt.tight_layout()
+    plt.show()

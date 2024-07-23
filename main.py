@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from utils import get_data, get_probabilities, estimate_q_Z_given_A, get_probabilities_one_hot
+from utils import get_data, get_probabilities, estimate_q_Z_given_A, get_probabilities_one_hot, plot_histograms
 from models import LogisticRegression, COVAR, LogisticRegressionGD
 from sklearn.decomposition import NMF  # Placeholder for volmin factorization
 from volmin_nmf import *
@@ -29,7 +29,7 @@ def main():
     # =============================================================================
     p_source = 0.8
     p_target = 0.2
-    total = 5000
+    total = 50000
     factorisation_atol = 1e-1
 
     # Step 2 parameters
@@ -90,6 +90,9 @@ def main():
 
     sum_epsilon = np.sum(epsilon_source)
     print("Sum of epsilon_source:", sum_epsilon.item())
+
+    sum_Y = np.sum(Y_source)
+    print("Sum of Y_source:", sum_Y.item())
 
     # =============================================================================
     # Step 1: Estimate p(Y|Z,a) and p(W|Z,a)
