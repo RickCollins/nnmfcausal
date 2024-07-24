@@ -50,8 +50,8 @@ def get_data_new(theta_a_z, theta_y_a, theta_y_w, theta_y_epsilon, theta_a_epsil
     # Target distribution data
     U_target, Z_target, W_target, X_target, Y_target = get_dataset_new(theta_a_z, theta_y_a, theta_y_w, theta_y_epsilon, theta_a_epsilon, p_target, total)
     
-    return (Z_source.numpy(), U_source.numpy(), W_source.numpy(), X_source.numpy(), Y_source.numpy()), \
-           (Z_target.numpy(), U_target.numpy(), W_target.numpy(), X_target.numpy(), Y_target.numpy())
+    return (Z_source, U_source, W_source, X_source, Y_source), \
+           (Z_target, U_target, W_target, X_target, Y_target)
 
 
 def get_probabilities(model, Z, A):

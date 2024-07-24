@@ -85,6 +85,11 @@ def get_dataset_new(theta_a_z,theta_y_a,theta_y_w,theta_y_epsilon, theta_a_epsil
     U,Z,W,X,Y = [],[],[],[],[]
     for _ in range(total):
         u,z,w,x,y = get_tuple_new(theta_a_z,theta_y_a,theta_y_w,theta_y_epsilon, theta_a_epsilon, p)
+        print(u)
+        print(z)
+        print(w)
+        print(x)
+        print(y)
         U.append(torch.tensor([[u]]))
         Z.append(z)
         W.append(w)
