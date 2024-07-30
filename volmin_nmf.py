@@ -270,7 +270,7 @@ class MVCNMF:
             S = self.S_new(X_bar, A_bar, S, beta)
             error_difference = np.abs(self.objective(X, A, S) - o)
             if error_difference < convergence_tolerance:
-                print("Converged with error difference", error_difference)
+                #print("Converged with error difference", error_difference)
                 break
             o = self.objective(X, A, S)
             if o < fit_tolerance:
